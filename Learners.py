@@ -191,4 +191,70 @@ class BaseSClassifier(object):
         yhat_1[:n]=prob1[:n]
         return yhat_1-yhat_0
     '''
+
+class BaseXClassifier_(object):
+    def __init__(self,learner, cate_learner, prospensity_learner):
+        self.learner0 = learner
+        self.learner1 = learner
+        self.learner2 = cate_learner
+        self.learner3 = cate_learner
+        self.prospensity_learner = prospensity_learner
+        self.model0 = None
+        self.model1 = None
+        
+    def fit(self,X,y,treatment):
+        X0 = X[treatment==0]
+        X1 = X[treatment==1]
+        y0 = y[treatment==0]
+        y1 = y[treatment==1]
+        D1 = y1 - self.learner0.fit(X0, y0).predict_proba(X1)[:,1]
+        D0 = self.learner1.fit(X1, y1).predict_proba(X0)[:,0] -y0
+        
+        self.model1 = self.learner2.fit(X1,D1)
+        self.model0 = self.learner3.fit(X0,D0)
+        
+        return D0,D1
+        
+    def predict(self,X):
+        prob0 = self.model0.predict(X)
+        prob1 = self.model1.predict(X)
+        return prob0,prob1
     
+    def get_prospensity(self, X, treatment):       
+        prospensity = self.prospensity_learner.fit(X, treatment).predict_proba(X)[:,1]
+        return prospensity
+    
+    def get_cate(self,X,y,treatment,p=None):
+        # replace all with estimated value
+        D0,D1 = self.fit(X,y,treatment)
+        prob0, prob1 = self.predict(X)
+        if p==None:
+            prospensity = self.get_prospensity(X,treatment)
+        else:
+            prospensity = p
+        return prospensity*prob0+(1-prospensity)*prob1
+    
+    def get_cate_(self,X,y,treatment, p=None):
+        # not replace the existing value
+        D0,D1 = self.fit(X,y,treatment)
+        prob0, prob1 = self.predict(X)
+
+        if p==None:
+            prospensity = self.get_prospensity(X,treatment)
+        else:
+            prospensity = p
+        
+        Dhat_0 = []
+        Dhat_1 = []
+        cnt0 = cnt1= 0
+        for i in range(len(y)):
+            if treatment[i]==0:
+                Dhat_0.append(D0[cnt0])
+                cnt0+=1
+                Dhat_1.append(prob1[i])
+            if treatment[i]==1:
+                Dhat_1.append(D1[cnt1])
+                cnt1+=1
+                Dhat_0.append(prob0[i])
+  
+        return prospensity*np.array(Dhat_0)+(1-prospensity)*np.array(Dhat_1) 
