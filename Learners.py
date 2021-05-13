@@ -11,6 +11,7 @@ class HonestRF():
     
     def fit(self,X,y):
         idx=list(np.arange(len(y)))
+        random.seed(0)
         random.shuffle(idx)
         train_idx = idx[:len(y)//2]
         test_idx = idx[len(y)//2:]
@@ -96,9 +97,32 @@ class BaseTClassifier(object):
         yhat_0[treatment==1]=prob0
         yhat_1[treatment==1]=y[treatment==1]
         yhat_1[treatment==0]=prob1
+        return yhat_1-yhat_0
+
+    def get_cate2(self,Xtrain,ytrain,Xtest,len0, len1,flag=1):
+        # replace all with estimated value
+        if flag:
+            self.fit(Xtrain,ytrain,np.array([0]*len0+[1]*len1))
+        prob0 = self.predict(Xtest, idx=0)
+        prob1 = self.predict(Xtest, idx=1)
+        return prob1-prob0
+    '''
+    def get_cate_2(self,Xtrain,ytrain,Xtest,len0, len1,flag=1):
+        # not replace the existing value
+        if flag:
+            self.fit(Xtrain,ytrain,np.array([0]*len0+[1]*len1))
+        prob0 = self.predict(Xtest, idx=0)
+        prob1 = self.predict(Xtest, idx=1)
+    
+        yhat_0 = np.zeros(len(y))
+        yhat_1 = np.zeros(len(y))
+        yhat_0[:n]=y[:n]
+        yhat_0[n:]=prob0
+        yhat_1[n:]=y[n:]
+        yhat_1[:n]=prob1
     
         return yhat_1-yhat_0
-        
+    '''
 
 class BaseSClassifier(object):
     def __init__(self,learner):
@@ -138,6 +162,33 @@ class BaseSClassifier(object):
         yhat_1[treatment==0]=prob1[treatment==0]
     
         return yhat_1-yhat_0
-
-
-
+    
+    def get_cate2(self,Xtrain,ytrain,Xtest,len0, len1,flag=1):
+        # replace all with estimated value
+        n = len(Xtrain)//2
+        if flag:
+            self.fit(Xtrain,ytrain,np.array([0]*len0+[1]*len1))
+        X0 = np.concatenate((Xtest,np.zeros([Xtest.shape[0],1])),axis=1)
+        X1 = np.concatenate((Xtest,np.ones([Xtest.shape[0],1])),axis=1)
+        prob0 = self.predict(X0)
+        prob1 = self.predict(X1)
+        return prob1-prob0
+    '''
+    def get_cate_2(self,Xtrain,ytrain,Xtest,len0, len1,flag=1):
+        # not replace the existing value
+        n = len(Xtrain)//2
+        if flag:
+            self.fit(Xtrain,ytrain,np.array([0]*len0+[1]*len1))
+        X0 = np.concatenate((Xtest,np.zeros([Xtest.shape[0],1])),axis=1)
+        X1 = np.concatenate((Xtest,np.ones([Xtest.shape[0],1])),axis=1)
+        prob0 = self.predict(X0)
+        prob1 = self.predict(X1)
+        yhat_0 = np.zeros(len(y))
+        yhat_1 = np.zeros(len(y))
+        yhat_0[:len0]=y[:len0]
+        yhat_0[len0:]=prob0[len0:]
+        yhat_1[n:]=y[n:]
+        yhat_1[:n]=prob1[:n]
+        return yhat_1-yhat_0
+    '''
+    
