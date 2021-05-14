@@ -26,12 +26,12 @@ class BaseTClassifier(object):
             if self.type==0:
                 prob = self.model0.predict_proba(X)[:, 1]
             else:
-                prob = self.model0.predict(X)
+                prob = self.model0.predict(X).reshape(-1)
         else:
             if self.type==0:
                 prob = self.model1.predict_proba(X)[:, 1]
             else:
-                prob = self.model1.predict(X)
+                prob = self.model1.predict(X).reshape(-1)
         return prob
 
     def get_cate(self,X,y,treatment):
@@ -95,7 +95,7 @@ class BaseSClassifier(object):
         if self.type==0:
             prob = self.model.predict_proba(X)[:, 1]
         else:
-            prob = self.model.predict(X)
+            prob = self.model.predict(X).reshape(-1)
         return prob
 
     def get_cate(self,X,y,treatment):
@@ -172,8 +172,8 @@ class BaseXClassifier(object):
             D1 = y1 - self.learner0.fit(X0, y0).predict_proba(X1)[:,1]
             D0 = self.learner1.fit(X1, y1).predict_proba(X0)[:,1] -y0
         else:
-            D1 = y1 - self.learner0.fit(X0, y0).predict(X1)
-            D0 = self.learner1.fit(X1, y1).predict(X0) -y0
+            D1 = y1 - self.learner0.fit(X0, y0).predict(X1).reshape(-1)
+            D0 = self.learner1.fit(X1, y1).predict(X0).reshape(-1) -y0
         
         self.model1 = self.learner2.fit(X1,D1)
         self.model0 = self.learner3.fit(X0,D0)
@@ -181,8 +181,8 @@ class BaseXClassifier(object):
         return D0,D1
         
     def predict(self,X):
-        prob0 = self.model0.predict(X)
-        prob1 = self.model1.predict(X)
+        prob0 = self.model0.predict(X).reshape(-1)
+        prob1 = self.model1.predict(X).reshape(-1)
         return prob0,prob1
     
     def get_prospensity(self, X, treatment):
@@ -200,9 +200,10 @@ class BaseXClassifier(object):
             prospensity = self.get_prospensity(X,treatment)
         else:
             prospensity = p
+        #print(prob0.shape,prob1.shape)
         return prospensity*prob0+(1-prospensity)*prob1
     
-    def get_cate2(self,Xtrain,ytrain,Xtest,len0, len1,p=None):
+    def get_cate2(self,Xtrain,ytrain,Xtest,len0,len1, treatment, p=None):
         # replace all with estimated value
         D0,D1 = self.fit(Xtrain,ytrain,np.array([0]*len0+[1]*len1))
         prob0, prob1 = self.predict(Xtest)
