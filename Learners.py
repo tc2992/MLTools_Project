@@ -1,7 +1,7 @@
 from sklearn.ensemble import RandomForestClassifier
 import numpy as np
 import random
-
+from copy import deepcopy
         
         
 class BaseTClassifier(object):
@@ -154,12 +154,12 @@ class BaseSClassifier(object):
     '''
 
 class BaseXClassifier(object):
-    def __init__(self,learner, cate_learner, prospensity_learner, type_=0):
-        self.learner0 = learner
-        self.learner1 = learner
-        self.learner2 = cate_learner
-        self.learner3 = cate_learner
-        self.prospensity_learner = prospensity_learner
+    def __init__(self,learner, cate_learner, prospensity_learner=RandomForestClassifier(), type_=0):
+        self.learner0 = deepcopy(learner)
+        self.learner1 = deepcopy(learner)
+        self.learner2 = deepcopy(cate_learner)
+        self.learner3 = deepcopy(cate_learner)
+        self.prospensity_learner = deepcopy(prospensity_learner)
         self.model0 = None
         self.model1 = None
         self.type = type_
@@ -171,7 +171,7 @@ class BaseXClassifier(object):
         y1 = y[treatment==1]
         if self.type==0:
             D1 = y1 - self.learner0.fit(X0, y0).predict_proba(X1)[:,1]
-            D0 = self.learner1.fit(X1, y1).predict_proba(X0)[:,0] -y0
+            D0 = self.learner1.fit(X1, y1).predict_proba(X0)[:,1] -y0
         else:
             D1 = y1 - self.learner0.fit(X0, y0).predict(X1)
             D0 = self.learner1.fit(X1, y1).predict(X0) -y0
@@ -187,10 +187,10 @@ class BaseXClassifier(object):
         return prob0,prob1
     
     def get_prospensity(self, X, treatment):
-        if self.type==0:
-            prospensity = self.prospensity_learner.fit(X, treatment).predict_proba(X)[:,1]
-        else:
-            prospensity = self.prospensity_learner.fit(X, treatment).predict(X)
+        #if self.type==0:
+        prospensity = self.prospensity_learner.fit(X, treatment).predict_proba(X)[:,1]
+        #else:
+        #    prospensity = self.prospensity_learner.fit(X, treatment).predict(X)
         return prospensity
     
     def get_cate(self,X,y,treatment,p=None):
