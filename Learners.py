@@ -2,80 +2,36 @@ from sklearn.ensemble import RandomForestClassifier
 import numpy as np
 import random
 
-
-class HonestRF():
-    def __init__(self,rf=RandomForestClassifier()):
-        self.rf = rf
-        self.leaf = None
-        self.proba = None #(n_nodes, n_trees)
-    
-    def fit(self,X,y):
-        idx=list(np.arange(len(y)))
-        random.seed(0)
-        random.shuffle(idx)
-        train_idx = idx[:len(y)//2]
-        test_idx = idx[len(y)//2:]
-    
-        Xtrain=X[train_idx]
-        ytrain=y[train_idx]
-        Xtest=X[test_idx]
-        ytest=y[test_idx]
-    
-        self.rf = self.rf.fit(Xtrain,ytrain)
-        self.set_proba(Xtest,ytest)
-        return self
-
-    def set_proba(self,X,y):
-        mat = self.rf.apply(X)
-        self.leaf = np.unique(mat)
-        self.proba = np.zeros((max(self.leaf)+1,mat.shape[1]))
-        for i in self.leaf:
-            for j in range(mat.shape[1]):
-                tree = mat[:,j]
-                idx = np.where(tree==i)[0]
-                if len(idx)==0:
-                    continue
-                prob1 = sum(y[idx])/len(y[idx])
-                self.proba[i,j] = prob1
-        
-    def predict_proba(self,X):
-        mat = self.rf.apply(X)
-        proba = np.zeros((X.shape[0],2))
-        for i in range(X.shape[0]):
-            idx = mat[i]
-            prob1 = 0
-            for j in range(mat.shape[1]):
-                if idx[j] >= self.proba.shape[0]:
-                    continue
-                prob1 += self.proba[idx[j],j]
-            prob1 /= mat.shape[1]
-            prob0=1-prob1
-            proba[i,0] = prob0
-            proba[i,1] = prob1
-        return proba
         
         
 class BaseTClassifier(object):
-    def __init__(self,learner0,learner1):
+    def __init__(self,learner0,learner1,type_=0):
         self.learner0 = learner0
         self.learner1 = learner1
         self.model0 = None
         self.model1 = None
-    
+        self.type = type_
+
     def fit(self,X,y,treatment):
         X0 = X[treatment==0]
         X1 = X[treatment==1]
         y0 = y[treatment==0]
         y1 = y[treatment==1]
-    
+
         self.model0 = self.learner0.fit(X0, y0)
         self.model1 = self.learner1.fit(X1, y1)
-    
+
     def predict(self,X, idx):
         if idx==0:
-            prob = self.model0.predict_proba(X)[:, 1]
+            if self.type==0:
+                prob = self.model0.predict_proba(X)[:, 1]
+            else:
+                prob = self.model0.predict(X)
         else:
-            prob = self.model1.predict_proba(X)[:, 1]
+            if self.type==0:
+                prob = self.model1.predict_proba(X)[:, 1]
+            else:
+                prob = self.model1.predict(X)
         return prob
 
     def get_cate(self,X,y,treatment):
@@ -90,15 +46,16 @@ class BaseTClassifier(object):
         self.fit(X,y,treatment)
         prob0 = self.predict(X[treatment==1], idx=0)
         prob1 = self.predict(X[treatment==0], idx=1)
-    
+
         yhat_0 = np.zeros(len(y))
         yhat_1 = np.zeros(len(y))
         yhat_0[treatment==0]=y[treatment==0]
         yhat_0[treatment==1]=prob0
         yhat_1[treatment==1]=y[treatment==1]
         yhat_1[treatment==0]=prob1
-        return yhat_1-yhat_0
 
+        return yhat_1-yhat_0
+    
     def get_cate2(self,Xtrain,ytrain,Xtest,len0, len1,flag=1):
         # replace all with estimated value
         if flag:
@@ -125,16 +82,20 @@ class BaseTClassifier(object):
     '''
 
 class BaseSClassifier(object):
-    def __init__(self,learner):
+    def __init__(self,learner, type_=0):
         self.learner = learner
         self.model = None
-    
+        self.type = type_
+
     def fit(self,X,y,treatment):
         new_X = np.concatenate((X,treatment.reshape(-1,1)),axis=1)
         self.model = self.learner.fit(new_X, y)
-    
+
     def predict(self,X):
-        prob = self.model.predict_proba(X)[:, 1]
+        if self.type==0:
+            prob = self.model.predict_proba(X)[:, 1]
+        else:
+            prob = self.model.predict(X)
         return prob
 
     def get_cate(self,X,y,treatment):
@@ -153,14 +114,14 @@ class BaseSClassifier(object):
         X1 = np.concatenate((X,np.ones([X.shape[0],1])),axis=1)
         prob0 = self.predict(X0)
         prob1 = self.predict(X1)
-    
+
         yhat_0 = np.zeros(len(y))
         yhat_1 = np.zeros(len(y))
         yhat_0[treatment==0]=y[treatment==0]
         yhat_0[treatment==1]=prob0[treatment==1]
         yhat_1[treatment==1]=y[treatment==1]
         yhat_1[treatment==0]=prob1[treatment==0]
-    
+
         return yhat_1-yhat_0
     
     def get_cate2(self,Xtrain,ytrain,Xtest,len0, len1,flag=1):
@@ -192,8 +153,8 @@ class BaseSClassifier(object):
         return yhat_1-yhat_0
     '''
 
-class BaseXClassifier_(object):
-    def __init__(self,learner, cate_learner, prospensity_learner):
+class BaseXClassifier(object):
+    def __init__(self,learner, cate_learner, prospensity_learner, type_=0):
         self.learner0 = learner
         self.learner1 = learner
         self.learner2 = cate_learner
@@ -201,14 +162,19 @@ class BaseXClassifier_(object):
         self.prospensity_learner = prospensity_learner
         self.model0 = None
         self.model1 = None
+        self.type = type_
         
     def fit(self,X,y,treatment):
         X0 = X[treatment==0]
         X1 = X[treatment==1]
         y0 = y[treatment==0]
         y1 = y[treatment==1]
-        D1 = y1 - self.learner0.fit(X0, y0).predict_proba(X1)[:,1]
-        D0 = self.learner1.fit(X1, y1).predict_proba(X0)[:,0] -y0
+        if self.type==0:
+            D1 = y1 - self.learner0.fit(X0, y0).predict_proba(X1)[:,1]
+            D0 = self.learner1.fit(X1, y1).predict_proba(X0)[:,0] -y0
+        else:
+            D1 = y1 - self.learner0.fit(X0, y0).predict(X1)
+            D0 = self.learner1.fit(X1, y1).predict(X0) -y0
         
         self.model1 = self.learner2.fit(X1,D1)
         self.model0 = self.learner3.fit(X0,D0)
@@ -220,8 +186,11 @@ class BaseXClassifier_(object):
         prob1 = self.model1.predict(X)
         return prob0,prob1
     
-    def get_prospensity(self, X, treatment):       
-        prospensity = self.prospensity_learner.fit(X, treatment).predict_proba(X)[:,1]
+    def get_prospensity(self, X, treatment):
+        if self.type==0:
+            prospensity = self.prospensity_learner.fit(X, treatment).predict_proba(X)[:,1]
+        else:
+            prospensity = self.prospensity_learner.fit(X, treatment).predict(X)
         return prospensity
     
     def get_cate(self,X,y,treatment,p=None):
