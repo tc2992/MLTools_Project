@@ -126,7 +126,6 @@ class BaseSClassifier(object):
     
     def get_cate2(self,Xtrain,ytrain,Xtest,len0, len1,flag=1):
         # replace all with estimated value
-        n = len(Xtrain)//2
         if flag:
             self.fit(Xtrain,ytrain,np.array([0]*len0+[1]*len1))
         X0 = np.concatenate((Xtest,np.zeros([Xtest.shape[0],1])),axis=1)
@@ -199,6 +198,16 @@ class BaseXClassifier(object):
         prob0, prob1 = self.predict(X)
         if p==None:
             prospensity = self.get_prospensity(X,treatment)
+        else:
+            prospensity = p
+        return prospensity*prob0+(1-prospensity)*prob1
+    
+    def get_cate2(self,Xtrain,ytrain,Xtest,len0, len1,p=None):
+        # replace all with estimated value
+        D0,D1 = self.fit(Xtrain,ytrain,np.array([0]*len0+[1]*len1))
+        prob0, prob1 = self.predict(Xtest)
+        if p==None:
+            prospensity = self.get_prospensity(Xtest,treatment)
         else:
             prospensity = p
         return prospensity*prob0+(1-prospensity)*prob1
