@@ -63,23 +63,23 @@ class BaseTClassifier(object):
         prob0 = self.predict(Xtest, idx=0)
         prob1 = self.predict(Xtest, idx=1)
         return prob1-prob0
-    '''
-    def get_cate_2(self,Xtrain,ytrain,Xtest,len0, len1,flag=1):
+    
+    def get_cate_2(self,Xtrain,ytrain,Xtest,ytest,len0, len1,treatment,flag=1):
         # not replace the existing value
         if flag:
             self.fit(Xtrain,ytrain,np.array([0]*len0+[1]*len1))
-        prob0 = self.predict(Xtest, idx=0)
-        prob1 = self.predict(Xtest, idx=1)
-    
-        yhat_0 = np.zeros(len(y))
-        yhat_1 = np.zeros(len(y))
-        yhat_0[:n]=y[:n]
-        yhat_0[n:]=prob0
-        yhat_1[n:]=y[n:]
-        yhat_1[:n]=prob1
+        prob0 = self.predict(Xtest[treatment==1], idx=0)
+        prob1 = self.predict(Xtest[treatment==0], idx=1)
+
+        yhat_0 = np.zeros(len(ytest))
+        yhat_1 = np.zeros(len(ytest))
+        yhat_0[treatment==0]=ytest[treatment==0]
+        yhat_0[treatment==1]=prob0
+        yhat_1[treatment==1]=ytest[treatment==1]
+        yhat_1[treatment==0]=prob1
     
         return yhat_1-yhat_0
-    '''
+    
 
 class BaseSClassifier(object):
     def __init__(self,learner, type_=0):
@@ -133,24 +133,27 @@ class BaseSClassifier(object):
         prob0 = self.predict(X0)
         prob1 = self.predict(X1)
         return prob1-prob0
-    '''
-    def get_cate_2(self,Xtrain,ytrain,Xtest,len0, len1,flag=1):
+    
+    def get_cate_2(self,Xtrain,ytrain,Xtest,ytest,len0, len1,treatment,flag=1):
         # not replace the existing value
         n = len(Xtrain)//2
         if flag:
             self.fit(Xtrain,ytrain,np.array([0]*len0+[1]*len1))
+            
         X0 = np.concatenate((Xtest,np.zeros([Xtest.shape[0],1])),axis=1)
         X1 = np.concatenate((Xtest,np.ones([Xtest.shape[0],1])),axis=1)
         prob0 = self.predict(X0)
         prob1 = self.predict(X1)
-        yhat_0 = np.zeros(len(y))
-        yhat_1 = np.zeros(len(y))
-        yhat_0[:len0]=y[:len0]
-        yhat_0[len0:]=prob0[len0:]
-        yhat_1[n:]=y[n:]
-        yhat_1[:n]=prob1[:n]
+
+        yhat_0 = np.zeros(len(ytest))
+        yhat_1 = np.zeros(len(ytest))
+        yhat_0[treatment==0]=ytest[treatment==0]
+        yhat_0[treatment==1]=prob0[treatment==1]
+        yhat_1[treatment==1]=ytest[treatment==1]
+        yhat_1[treatment==0]=prob1[treatment==0]
+
         return yhat_1-yhat_0
-    '''
+    
 
 class BaseXClassifier(object):
     def __init__(self,learner, cate_learner, prospensity_learner=RandomForestClassifier(), type_=0):
@@ -227,6 +230,30 @@ class BaseXClassifier(object):
         Dhat_1 = []
         cnt0 = cnt1= 0
         for i in range(len(y)):
+            if treatment[i]==0:
+                Dhat_0.append(D0[cnt0])
+                cnt0+=1
+                Dhat_1.append(prob1[i])
+            if treatment[i]==1:
+                Dhat_1.append(D1[cnt1])
+                cnt1+=1
+                Dhat_0.append(prob0[i])
+  
+        return prospensity*np.array(Dhat_0)+(1-prospensity)*np.array(Dhat_1) 
+    def get_cate_2(self,Xtrain,ytrain,Xtest,ytest,len0,len1, treatment, p=None):
+        # not replace the existing value
+        D0,D1 = self.fit(Xtrain,ytrain,np.array([0]*len0+[1]*len1))
+        prob0, prob1 = self.predict(Xtest)
+
+        if p==None:
+            prospensity = self.get_prospensity(Xtest,treatment)
+        else:
+            prospensity = p
+        
+        Dhat_0 = []
+        Dhat_1 = []
+        cnt0 = cnt1= 0
+        for i in range(len(ytest)):
             if treatment[i]==0:
                 Dhat_0.append(D0[cnt0])
                 cnt0+=1
